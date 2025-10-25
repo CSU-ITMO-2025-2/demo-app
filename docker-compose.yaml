@@ -1,0 +1,37 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: todo_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf
+    ports:
+      - "5435:5432"
+    networks:
+      - todos_network
+
+
+  app:
+    build: ./app
+    volumes:
+      - ./app:/app
+    ports:
+      - "8008:8000"
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/todo_db
+    networks:
+      - todos_network
+
+networks:
+  todos_network:
+
+
+volumes:
+  postgres_data:
