@@ -1,4 +1,4 @@
-from api import todos
+from api import todos, health
 from db import database, models
 from fastapi import FastAPI
 
@@ -9,3 +9,4 @@ app = FastAPI()
 
 # Подключение маршрутов
 app.include_router(todos.router)
+app.include_router(health.router)
