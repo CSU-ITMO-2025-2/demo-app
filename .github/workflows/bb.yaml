@@ -54,14 +54,14 @@ jobs:
 
       - name: Update image.tag in helm/values.yaml
         run: |
-          NEW_TAG='${{ needs.build.outputs.image_tag }}'
-          FILE='helm/values.yaml'
-          # простой безопасный апдейт через yq
-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
-          sudo chmod +x /usr/local/bin/yq
-          yq eval --inplace '.image.tag = env(NEW_TAG)' "$FILE"
+          set -euo pipefail
+          echo "NEW_TAG=${NEW_TAG}"
+          curl -sSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
+          chmod +x /usr/local/bin/yq
+          export NEW_TAG
+          yq eval -i '.image.tag = env(NEW_TAG)' helm/values.yaml
           echo "Changed image.tag to: $NEW_TAG"
-          git diff -- "$FILE"
+          grep -n '^[[:space:]]*tag:' helm/values.yaml
 
       - name: Create PR
         uses: peter-evans/create-pull-request@v6
