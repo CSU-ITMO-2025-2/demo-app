@@ -54,13 +54,12 @@ jobs:
 
       - name: Update image.tag in helm/values.yaml
         run: |
-          set -euo pipefail
-          echo "NEW_TAG=${NEW_TAG}"
+          NEW_TAG="${{ needs.build.outputs.image_tag }}"
+          echo "Updating image.tag to $NEW_TAG"
           curl -sSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
           chmod +x /usr/local/bin/yq
-          export NEW_TAG
-          yq eval -i '.image.tag = env(NEW_TAG)' helm/values.yaml
-          echo "Changed image.tag to: $NEW_TAG"
+          yq eval -i ".image.tag = \"${NEW_TAG}\"" helm/values.yaml
+          echo "Changed image.tag to:"
           grep -n '^[[:space:]]*tag:' helm/values.yaml
 
       - name: Create PR
