@@ -34,8 +34,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: app/Dockerfile.kube
+          context: ./app
+          file: Dockerfile.kube
           push: true
           tags: |
             ghcr.io/csu-itmo-2025-2/demo-app:${{ steps.settag.outputs.image_tag }}
