@@ -24,6 +24,12 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
+      - name: Debug owner
+        run: |
+          echo "actor=${{ github.actor }}"
+          echo "owner=${{ github.repository_owner }}"
+          echo "repo=${{ github.repository }}"
+
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -37,8 +43,7 @@ jobs:
           context: ./app
           file: ./app/Dockerfile.kube
           push: true
-          tags: |
-            ghcr.io/csu-itmo-2025-2/demo-app:${{ steps.settag.outputs.image_tag }}
+          tags: ghcr.io/${{ github.repository_owner }}/demo-app:${{ steps.settag.outputs.image_tag }}
 
   bump:
     needs: build
