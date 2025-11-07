@@ -59,7 +59,7 @@ jobs:
           # простой безопасный апдейт через yq
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
-          yq -i '.image.tag = strenv(NEW_TAG)' "$FILE"
+          yq eval --inplace '.image.tag = env(NEW_TAG)' "$FILE"
           echo "Changed image.tag to: $NEW_TAG"
           git diff -- "$FILE"
 
