@@ -64,7 +64,7 @@ jobs:
         id: update_tag
         run: |
           NEW_TAG="${{ needs.build.outputs.image_tag }}"
-          CONFIG_PATH="helm-config/charts/demo-app/values.yaml" # Предполагаем, что чарт находится в helm-config/charts/demo-app
+          CONFIG_PATH="helm-config/values.yaml"
 
           # Установка yq
           curl -sSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
