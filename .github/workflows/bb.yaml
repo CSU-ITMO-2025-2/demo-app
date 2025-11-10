@@ -1,10 +1,10 @@
 name: build-and-bump
+
 on:
   push:
     branches: [ "main" ]
     paths:
       - "app/**"
-      - "helm/**"
 
 jobs:
   build:
@@ -50,26 +50,49 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      
+      # 1. Клонирование репозитория конфигурации
+      - name: Checkout Config Repo
+        uses: actions/checkout@v4
+        with:
+          repository: CSU-ITMO-2025-2/demo-app-helm # URL вашего репозитория Helm-чартов
+          path: helm-config                       # Клонируем в подкаталог helm-config
+          token: ${{ secrets.CONFIG_REPO_PAT }}   # Используем токен с правами записи
 
+      # 2. Установка YQ и обновление values.yaml
       - name: Update image.tag in helm/values.yaml
+        id: update_tag
         run: |
           NEW_TAG="${{ needs.build.outputs.image_tag }}"
-          echo "Updating image.tag to $NEW_TAG"
+          CONFIG_PATH="helm-config/charts/demo-app/values.yaml" # Предполагаем, что чарт находится в helm-config/charts/demo-app
+
+          # Установка yq
           curl -sSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
           chmod +x /usr/local/bin/yq
-          yq eval -i ".image.tag = \"${NEW_TAG}\"" helm/values.yaml
-          echo "Changed image.tag to:"
-          grep -n '^[[:space:]]*tag:' helm/values.yaml
 
+          # Обновление тега в файле конфигурации
+          yq eval -i ".image.tag = \"${NEW_TAG}\"" "$CONFIG_PATH"
+          
+          # Проверка, есть ли изменения в файле после yq
+          if [[ $(git -C helm-config status --porcelain) ]]; then
+            echo "::set-output name=files_changed::true"
+          else
+            echo "::set-output name=files_changed::false"
+          fi
+
+      # 3. Создание PR в удаленном репозитории
       - name: Create PR
+        if: steps.update_tag.outputs.files_changed == 'true' # Создаем PR только если values.yaml был изменен
         uses: peter-evans/create-pull-request@v6
         with:
+          token: ${{ secrets.CONFIG_REPO_PAT }} 
+          path: helm-config # Указываем, что нужно работать с клонированным репозиторием
           commit-message: "chore(ci): bump image.tag to ${{ needs.build.outputs.image_tag }}"
           title: "Bump image.tag to ${{ needs.build.outputs.image_tag }}"
           body: |
-            Auto-generated PR: update `helm/values.yaml` to image tag `${{ needs.build.outputs.image_tag }}`.
-            Merge this to trigger Argo CD sync.
+            Auto-generated PR: update `values.yaml` to image tag `${{ needs.build.outputs.image_tag }}`.
+            
+            ➡️ **Merge this PR to trigger Argo CD sync in the cluster.**
           branch: ci/bump-image-${{ needs.build.outputs.image_tag }}
           base: main
           labels: ci, automated
