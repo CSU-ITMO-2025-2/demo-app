@@ -7,4 +7,4 @@ def read_health():
     """
     Простой эндпоинт для liveness/readiness проб.
     """
-    return {"status": "okay"}
+    return {"status": "ok"}
