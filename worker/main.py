@@ -1,0 +1,121 @@
+import json
+import logging
+import os
+import time
+from typing import List
+
+from sqlalchemy.orm import Session
+
+from common.database import SessionLocal
+from common.models import TodoItem, TodoStep
+from common.kafka_client import create_todo_consumer
+
+from openai import OpenAI
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+
+if not OPENAI_API_KEY:
+    raise RuntimeError("OPENAI_API_KEY env var is required for worker")
+
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+
+def llm_generate_steps(title: str) -> List[str]:
+    """
+    Генерируем шаги при помощи ChatGPT-модели.
+
+    Просим модель вернуть ЧИСТЫЙ JSON-массив строк:
+    ["step 1", "step 2", ...]
+    """
+    system_prompt = (
+        "Ты помощник, который помогает разбивать цель пользователя на конкретный план действий.\n"
+        "ПОЛУЧИШЬ только формулировку цели (title).\n\n"
+        "Нужно вернуть 3–7 коротких конкретных шагов, что делать, чтобы приблизиться к цели.\n"
+        "Формат ответа — СТРОГО JSON-массив строк, без текста до или после.\n"
+        'Пример: ["Сделай X", "Сделай Y", "Сделай Z"]'
+    )
+
+    user_prompt = f"Цель: {title}"
+
+    logger.info("Calling LLM for title: %s", title)
+
+    resp = client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.4,
+    )
+
+    content = resp.choices[0].message.content.strip()
+    logger.debug("LLM raw response: %s", content)
+
+    try:
+        data = json.loads(content)
+        if isinstance(data, list):
+            steps = [str(x).strip() for x in data if str(x).strip()]
+            if steps:
+                return steps
+    except Exception as e:
+        logger.warning("Failed to parse LLM JSON, using fallback as single step: %s", e)
+
+    return [content]
+
+
+def process_message(db: Session, todo_id: int, title: str) -> None:
+    todo: TodoItem | None = db.query(TodoItem).filter(TodoItem.id == todo_id).first()
+    if not todo:
+        logger.warning("Todo %s not found, skip", todo_id)
+        return
+
+    if todo.steps:
+        logger.info("Todo %s already has %d steps, skip", todo_id, len(todo.steps))
+        return
+
+    steps_texts = llm_generate_steps(title)
+    logger.info("Generated %d steps for todo %s (%s)", len(steps_texts), todo_id, title)
+
+    for text in steps_texts:
+        step = TodoStep(todo_id=todo_id, description=text, completed=False)
+        db.add(step)
+
+    db.commit()
+    logger.info("Saved %d steps for todo %s", len(steps_texts), todo_id)
+
+
+def main() -> None:
+    consumer = create_todo_consumer(group_id="todo-generator")
+    logger.info("Todo generator worker started. Waiting for messages...")
+
+    while True:
+        db = SessionLocal()
+        try:
+            for msg in consumer:
+                value = msg.value
+                todo_id = value.get("todo_id")
+                title = value.get("title", "")
+
+                logger.info("Got message for todo_id=%s, title=%s", todo_id, title)
+
+                if todo_id is None:
+                    logger.warning("No todo_id in message, skip: %s", value)
+                    continue
+
+                try:
+                    process_message(db, todo_id=todo_id, title=title)
+                except Exception as e:
+                    logger.exception("Error processing message for todo %s: %s", todo_id, e)
+        except Exception as e:
+            logger.exception("Worker loop crashed: %s. Sleep and retry...", e)
+            time.sleep(5)
+        finally:
+            db.close()
+
+
+if __name__ == "__main__":
+    main()

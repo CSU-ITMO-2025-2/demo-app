@@ -17,15 +17,36 @@ services:
 
 
   app:
-    build: ./app
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    environment:
+      PYTHONPATH: /app
+      DATABASE_URL: postgresql://postgres:password@db:5432/todo_db
     volumes:
       - ./app:/app
+      - ./common:/app/common
     ports:
       - "8008:8000"
     depends_on:
       - db
+    networks:
+      - todos_network
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
     environment:
-      - DATABASE_URL=postgresql://postgres:password@db:5432/todo_db
+      PYTHONPATH: /app
+      DATABASE_URL: postgresql://postgres:password@db:5432/todo_db
+      OPENAI_API_KEY: key
+    volumes:
+      - ./worker:/app
+      - ./common:/app/common
+    depends_on:
+      - db
+      - app
     networks:
       - todos_network
 

@@ -1,14 +1,15 @@
-# Используем официальный образ Python 3.11
 FROM python:3.11-slim
 
-# Устанавливаем рабочую директорию
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app
+
 WORKDIR /app
 
-# Копируем файл зависимостей
-COPY requirements.txt .
-
-# Устанавливаем зависимости
+COPY app/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Команда для запуска приложения
+COPY app/. .
+COPY common /app/common
+
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
