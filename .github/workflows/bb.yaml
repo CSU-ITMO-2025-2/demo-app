@@ -71,7 +71,7 @@ jobs:
           chmod +x /usr/local/bin/yq
 
           # Обновление тега в файле конфигурации
-          yq eval -i ".image.tag = \"${NEW_TAG}\"" "$CONFIG_PATH"
+          yq eval -i ".app.image.tag = \"${NEW_TAG}\"" "$CONFIG_PATH"
           
           # Проверка, есть ли изменения в файле после yq
           if [[ $(git -C helm-config status --porcelain) ]]; then

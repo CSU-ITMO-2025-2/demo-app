@@ -9,7 +9,7 @@ on:
 
 env:
   CONFIG_REPO: CSU-ITMO-2025-2/demo-app-helm
-  VALUES_FILE: worker/values.yaml
+  VALUES_FILE: values.yaml
   IMAGE_NAME: demo-worker
 
 jobs:
@@ -73,7 +73,7 @@ jobs:
           curl -sSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
           chmod +x /usr/local/bin/yq
 
-          yq eval -i ".image.tag = \"${NEW_TAG}\"" "$CONFIG_PATH"
+          yq eval -i ".worker.image.tag = \"${NEW_TAG}\"" "$CONFIG_PATH"
 
           if [[ $(git -C helm-config status --porcelain) ]]; then
             echo "files_changed=true" >> "$GITHUB_OUTPUT"
