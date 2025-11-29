@@ -65,14 +65,50 @@ def llm_generate_steps(title: str) -> List[str]:
     content = resp.choices[0].message.content.strip()
     logger.debug("LLM raw response: %s", content)
 
-    try:
-        data = json.loads(content)
-        if isinstance(data, list):
-            steps = [str(x).strip() for x in data if str(x).strip()]
-            if steps:
-                return steps
-    except Exception as e:
-        logger.warning("Failed to parse LLM JSON, using fallback as single step: %s", e)
+    def try_parse_json(text: str) -> List[str] | None:
+        try:
+            data = json.loads(text)
+            if isinstance(data, list):
+                steps = [str(x).strip() for x in data if str(x).strip()]
+                return steps or None
+        except Exception:
+            return None
+
+    steps = try_parse_json(content)
+    if steps:
+        return steps
+
+    if "```" in content:
+        fenced = content.split("```")
+        for block in fenced:
+            maybe = try_parse_json(block.strip())
+            if maybe:
+                return maybe
+        for block in fenced:
+            if "[" in block and "]" in block:
+                snippet = block[block.find("[") : block.rfind("]") + 1]
+                maybe = try_parse_json(snippet)
+                if maybe:
+                    return maybe
+
+    if "[" in content and "]" in content:
+        snippet = content[content.find("[") : content.rfind("]") + 1]
+        steps = try_parse_json(snippet)
+        if steps:
+            return steps
+
+    lines = []
+    for line in content.splitlines():
+        stripped = line.strip("`").strip()
+        if not stripped:
+            continue
+        for prefix in ("- ", "* ", "• ", "1. ", "2. ", "3. ", "4. ", "5. "):
+            if stripped.startswith(prefix):
+                stripped = stripped[len(prefix) :]
+                break
+        lines.append(stripped)
+    if len(lines) > 1:
+        return lines
 
     return [content]
 
