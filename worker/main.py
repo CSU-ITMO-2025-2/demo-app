@@ -15,14 +15,18 @@ from openai import OpenAI
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+YANDEX_CLOUD_API_KEY = os.getenv("YANDEX_CLOUD_API_KEY")
+YANDEX_CLOUD_FOLDER = os.getenv("YANDEX_CLOUD_FOLDER")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
 
-if not OPENAI_API_KEY:
-    raise RuntimeError("OPENAI_API_KEY env var is required for worker")
+if not YANDEX_CLOUD_API_KEY:
+    raise RuntimeError("YANDEX_CLOUD_API_KEY env var is required for worker")
 
-client = OpenAI(api_key=OPENAI_API_KEY)
-
+client = OpenAI(
+    api_key=YANDEX_CLOUD_API_KEY,
+    base_url="https://llm.api.cloud.yandex.net/v1",
+    project=YANDEX_CLOUD_FOLDER
+)
 
 def llm_generate_steps(title: str) -> List[str]:
     """
@@ -43,14 +47,20 @@ def llm_generate_steps(title: str) -> List[str]:
 
     logger.info("Calling LLM for title: %s", title)
 
-    resp = client.chat.completions.create(
-        model=OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0.4,
-    )
+    try:
+        resp = client.chat.completions.create(
+            model=f"gpt://{YANDEX_CLOUD_FOLDER}/yandexgpt/rc",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.4,
+        )
+    except Exception as e:
+        logger.warning(
+            "LLM call failed, using fallback steps for title '%s': %s", title, e
+        )
+        return [f"Review requirements for: {title}"]
 
     content = resp.choices[0].message.content.strip()
     logger.debug("LLM raw response: %s", content)
