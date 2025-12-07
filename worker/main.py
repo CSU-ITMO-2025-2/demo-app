@@ -147,7 +147,7 @@ def main() -> None:
                 title = value.get("title", "")
 
                 logger.info("Got message for todo_id=%s, title=%s", todo_id, title)
-
+                time.sleep(10)
                 if todo_id is None:
                     logger.warning("No todo_id in message, skip: %s", value)
                     continue
