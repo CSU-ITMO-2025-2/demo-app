@@ -11,6 +11,7 @@ router = APIRouter()
 
 @router.get("/todos", response_model=List[TodoItem])
 def read_todos(db: Session = Depends(get_db)):
+    1 / 0
     return crud_todos.get_todos(db)
 
 
